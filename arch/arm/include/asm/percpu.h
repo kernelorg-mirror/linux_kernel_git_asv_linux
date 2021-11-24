@@ -25,39 +25,10 @@ static inline void set_my_cpu_offset(unsigned long off)
 	asm volatile("mcr p15, 0, %0, c13, c0, 4" : : "r" (off) : "memory");
 }
 
-static inline unsigned long __my_cpu_offset(void)
+extern unsigned long __per_cpu_offset[];
+static __always_inline unsigned long __my_cpu_offset(void)
 {
-	unsigned long off;
-
-	/*
-	 * Read TPIDRPRW.
-	 * We want to allow caching the value, so avoid using volatile and
-	 * instead use a fake stack read to hazard against barrier().
-	 */
-	asm("0:	mrc p15, 0, %0, c13, c0, 4			\n\t"
-#ifdef CONFIG_CPU_V6
-	    "1:							\n\t"
-	    "	.subsection 1					\n\t"
-#if !(defined(MODULE) && defined(CONFIG_ARM_MODULE_PLTS)) && \
-    !(defined(CONFIG_LD_IS_LLD) && CONFIG_LLD_VERSION < 140000)
-	    "2: " LOAD_SYM_ARMV6(%0, __per_cpu_offset) "	\n\t"
-	    "	b	1b					\n\t"
-#else
-	    "2: ldr	%0, 3f					\n\t"
-	    "	ldr	%0, [%0]				\n\t"
-	    "	b	1b					\n\t"
-	    "3:	.long	__per_cpu_offset			\n\t"
-#endif
-	    "	.previous					\n\t"
-	    "	.pushsection \".alt.smp.init\", \"a\"		\n\t"
-	    "	.long	0b - .					\n\t"
-	    "	b	. + (2b - 0b)				\n\t"
-	    "	.popsection					\n\t"
-#endif
-	     : "=r" (off)
-	     : "Q" (*(const unsigned long *)current_stack_pointer));
-
-	return off;
+	return __per_cpu_offset[0];
 }
 #define __my_cpu_offset __my_cpu_offset()
 #else

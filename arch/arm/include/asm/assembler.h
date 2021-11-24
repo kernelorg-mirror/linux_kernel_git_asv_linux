@@ -203,41 +203,12 @@ THUMB(	fpreg	.req	r7	)
 	.endm
 	.endr
 
-	.macro	get_current, rd
-#ifdef CONFIG_CURRENT_POINTER_IN_TPIDRURO
-	mrc	p15, 0, \rd, c13, c0, 3		@ get TPIDRURO register
-#else
-	get_thread_info \rd
-	ldr	\rd, [\rd, #TI_TASK]
-#endif
-	.endm
-
-	.macro	set_current, rn
-#ifdef CONFIG_CURRENT_POINTER_IN_TPIDRURO
-	mcr	p15, 0, \rn, c13, c0, 3		@ set TPIDRURO register
-#endif
-	.endm
-
-	.macro	reload_current, t1:req, t2:req
-#ifdef CONFIG_CURRENT_POINTER_IN_TPIDRURO
-	ldr_this_cpu \t1, __entry_task, \t1, \t2
-	mcr	p15, 0, \t1, c13, c0, 3		@ store in TPIDRURO
-#endif
-	.endm
-
 /*
  * Get current thread_info.
  */
 	.macro	get_thread_info, rd
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	/* thread_info is the first member of struct task_struct */
 	get_current \rd
-#else
- ARM(	mov	\rd, sp, lsr #THREAD_SIZE_ORDER + PAGE_SHIFT	)
- THUMB(	mov	\rd, sp			)
- THUMB(	lsr	\rd, \rd, #THREAD_SIZE_ORDER + PAGE_SHIFT	)
-	mov	\rd, \rd, lsl #THREAD_SIZE_ORDER + PAGE_SHIFT
-#endif
 	.endm
 
 /*
@@ -315,19 +286,28 @@ THUMB(	fpreg	.req	r7	)
 	 * 		     register 'rd'
 	 */
 	.macro		this_cpu_offset, rd:req
-#ifdef CONFIG_SMP
-ALT_SMP(mrc		p15, 0, \rd, c13, c0, 4)
-#ifdef CONFIG_CPU_V6
-ALT_UP_B(.L1_\@)
-.L0_\@:
-	.subsection	1
-.L1_\@: ldr_va		\rd, __per_cpu_offset
-	b		.L0_\@
-	.previous
-#endif
-#else
-	mov		\rd, #0
-#endif
+	ldr_va		\rd, __per_cpu_offset
+	.endm
+
+	/*
+	 * set_current - store the task pointer of this CPU's current task
+	 */
+	.macro		set_current, rn:req, tmp:req
+	str_va		\rn, __current, \tmp
+	.endm
+
+	/*
+	 * get_current - load the task pointer of this CPU's current task
+	 */
+	.macro		get_current, rd:req
+	ldr_va		\rd, __current
+	.endm
+
+	/*
+	 * reload_current - reload the task pointer of this CPU's current task
+	 *		    into the TLS register
+	 */
+	.macro		reload_current, t1:req, t2:req
 	.endm
 
 /*
