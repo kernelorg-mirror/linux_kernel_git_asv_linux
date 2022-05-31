@@ -405,7 +405,13 @@ static void smp_store_cpu_info(unsigned int cpuid)
 
 static void set_current(struct task_struct *cur)
 {
-	__current = cur;
+	if (!IS_ENABLED(CONFIG_CURRENT_POINTER_IN_TPIDRURO) && !is_smp()) {
+		__current = cur;
+		return;
+	}
+
+	/* Set TPIDRURO */
+	asm("mcr p15, 0, %0, c13, c0, 3" :: "r"(cur) : "memory");
 }
 
 /*
